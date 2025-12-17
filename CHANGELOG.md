@@ -308,6 +308,11 @@ Thanks to the people who made this release happen!
 
 * `jj workspace forget` now warns about unknown workspaces instead of failing.
 
+* New command `jj bookmark advance` is a specialization of `jj bookmark move`
+  with defaults of `--from` and `--to`, which provides a convenient way to move
+  bookmarks relative to the working copy. The command is heavily inspired by
+  the longstanding community alias `jj tug`.
+
 ### Fixed bugs
 
 * Broken symlink on Windows. [#6934](https://github.com/jj-vcs/jj/issues/6934).

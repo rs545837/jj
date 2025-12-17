@@ -36,3 +36,7 @@ latest(
 
 'visible()' = '::visible_heads()'
 'hidden()' = '~visible()'
+
+# Default revsets used by `jj bookmark advance`.
+'closest_bookmarks(to)' = 'heads(::to & bookmarks())'
+'closest_pushable(to)' = 'heads(::to & ~description(exact:"") & (~empty() | merges()))'

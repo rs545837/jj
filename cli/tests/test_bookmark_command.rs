@@ -2893,6 +2893,127 @@ fn test_bad_auto_track_bookmarks() {
     ");
 }
 
+#[test]
+fn test_bookmark_advance_default() {
+    let test_env = TestEnvironment::default();
+    test_env.run_jj_in(".", ["git", "init", "repo"]).success();
+    let work_dir = test_env.work_dir("repo");
+
+    let get_log = || {
+        let template = r#"
+            separate(" ",
+                change_id.shortest(8),
+                description.first_line(),
+                if(empty, "(empty)"),
+                bookmarks,
+            )
+        "#;
+        work_dir.run_jj(["log", "-T", template])
+    };
+
+    // @ (empty)
+    // |
+    // d
+    // |
+    // c (empty) barrier for closest_pushable
+    // |
+    // b closest_pushable(@)
+    // |
+    // a bookmark A, closest_bookmarks(@)
+    work_dir.run_jj(["describe", "-m", "a"]).success();
+    work_dir.run_jj(["bookmark", "create", "A"]).success();
+    work_dir.run_jj(["new", "-m", "b"]).success();
+    std::fs::write(work_dir.root().join("file"), "content").unwrap();
+    work_dir.run_jj(["bookmark", "create", "B"]).success();
+    work_dir.run_jj(["new", "-m", "c"]).success();
+    std::fs::write(work_dir.root().join("file"), "new_content").unwrap();
+    work_dir.run_jj(["new", "-m", "d"]).success();
+    work_dir.run_jj(["new", "-m", "e"]).success();
+    std::fs::write(work_dir.root().join("file"), "newer_content").unwrap();
+    work_dir.run_jj(["new"]).success();
+
+    insta::assert_snapshot!(get_log(), @r"
+    @  yostqsxw (empty)
+    ○  vruxwmqv e
+    ○  yqosqzyt d (empty)
+    ○  royxmykx c
+    ○  zsuskuln b B
+    ○  qpvuntsm a (empty) A
+    ◆  zzzzzzzz (empty)
+    [EOF]
+    ");
+
+    let setup_opid = work_dir.current_operation_id();
+
+    // closest_bookmarks(@) -> closest_pushable(@)
+    let output = work_dir.run_jj(["bookmark", "advance"]);
+    insta::assert_snapshot!(output, @r"
+    ------- stderr -------
+    Moved 1 bookmarks to vruxwmqv 7753a73e B | e
+    [EOF]
+    ");
+    work_dir.run_jj(["op", "restore", &setup_opid]).success();
+
+    // closest_bookmarks(@) -> zsuskuln
+    let output = work_dir.run_jj(["bookmark", "advance", "-t", "royxmykx"]);
+    insta::assert_snapshot!(output, @r"
+    ------- stderr -------
+    Moved 1 bookmarks to royxmykx 26554c67 B | c
+    [EOF]
+    ");
+    work_dir.run_jj(["op", "restore", &setup_opid]).success();
+
+    // A -> closest_pushable(@)
+    let output = work_dir.run_jj(["bookmark", "advance", "-f", "A"]);
+    insta::assert_snapshot!(output, @r"
+    ------- stderr -------
+    Moved 1 bookmarks to vruxwmqv 7753a73e A | e
+    [EOF]
+    ");
+    work_dir.run_jj(["op", "restore", &setup_opid]).success();
+
+    // A -> zsuskuln
+    // This is just equivalent to a plain move.
+    let output = work_dir.run_jj(["bookmark", "advance", "-f", "A", "-t", "royxmykx"]);
+    insta::assert_snapshot!(output, @r"
+    ------- stderr -------
+    Moved 1 bookmarks to royxmykx 26554c67 A | c
+    [EOF]
+    ");
+
+    // With bookmark name filter.
+    let output = work_dir.run_jj(["bookmark", "advance", "A", "-t", "@-"]);
+    insta::assert_snapshot!(output, @r"
+    ------- stderr -------
+    Moved 1 bookmarks to vruxwmqv 7753a73e A | e
+    [EOF]
+    ");
+    work_dir.run_jj(["op", "restore", &setup_opid]).success();
+
+    // Nowhere to advance to.
+    work_dir.run_jj(["new", "qpvuntsm"]).success();
+    let output = work_dir.run_jj(["bookmark", "advance"]);
+    insta::assert_snapshot!(output, @r"
+    ------- stderr -------
+    Error: No suitable revision to advance to.
+    Hint: The revset `closest_pushable` controls the default target. You can also specify a specific target with `--to`.
+    [EOF]
+    [exit status: 1]
+    ");
+    // Nothing to push.
+    work_dir
+        .run_jj(["new", "root()", "-m", "pushable"])
+        .success();
+    std::fs::write(work_dir.root().join("file"), "content").unwrap();
+    work_dir.run_jj(["new"]).success();
+    let output = work_dir.run_jj(["bookmark", "advance"]);
+    insta::assert_snapshot!(output, @r"
+    ------- stderr -------
+    No bookmarks to update.
+    [EOF]
+    ");
+}
+
 #[must_use]
 fn get_log_output(work_dir: &TestWorkDir) -> CommandOutput {
     let template = r#"bookmarks ++ " " ++ commit_id.short()"#;

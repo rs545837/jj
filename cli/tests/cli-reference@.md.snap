@@ -16,6 +16,7 @@ This document contains the help content for the `jj` command-line program.
 * [`jj bisect`↴](#jj-bisect)
 * [`jj bisect run`↴](#jj-bisect-run)
 * [`jj bookmark`↴](#jj-bookmark)
+* [`jj bookmark advance`↴](#jj-bookmark-advance)
 * [`jj bookmark create`↴](#jj-bookmark-create)
 * [`jj bookmark delete`↴](#jj-bookmark-delete)
 * [`jj bookmark forget`↴](#jj-bookmark-forget)
@@ -345,6 +346,7 @@ See [`jj help -k bookmarks`] for more information.
 
 ###### **Subcommands:**
 
+* `advance` — Move existing bookmarks to a target revision with smart defaults
 * `create` — Create a new bookmark
 * `delete` — Delete an existing bookmark and propagate the deletion to remotes on the next push
 * `forget` — Forget a bookmark without marking it as a deletion to be pushed
@@ -354,6 +356,46 @@ See [`jj help -k bookmarks`] for more information.
 * `set` — Create a new bookmark, or update an existing one by name
 * `track` — Start tracking given remote bookmarks
 * `untrack` — Stop tracking given remote bookmarks
+
+
+
+## `jj bookmark advance`
+
+Move existing bookmarks to a target revision with smart defaults
+
+This is a specialization of `jj bookmark move` that provides convenient defaults for `--from` and `--to`, which makes it easy to move bookmarks relative to the working copy.
+
+The argument `--to` defaults to `closest_pushable(@)` and `--from` defaults to `closest_bookmarks(to)`. So by default, the command finds the closest bookmarks to @ and moves them to the nearest revision considered pushable. The default notion of pushable are described revisions that either have contents, or are merges.
+
+Examples:
+
+`jj bookmark advance` - Move closest bookmarks to the nearest pushable commit
+
+`jj bookmark advance --to @-` - Move closest bookmarks to the working-copy parent
+
+`jj bookmark advance --from main` Move a specific bookmark to the nearest pushable commit
+
+**Usage:** `jj bookmark advance [OPTIONS] [NAMES]...`
+
+**Command Alias:** `a`
+
+###### **Arguments:**
+
+* `<NAMES>` — Move bookmarks matching the given name patterns
+
+   By default, the specified pattern matches bookmark names with glob syntax. You can also use other [string pattern syntax].
+
+   [string pattern syntax]: https://docs.jj-vcs.dev/latest/revsets/#string-patterns
+
+###### **Options:**
+
+* `-f`, `--from <REVSETS>` — Move bookmarks from the given revisions
+
+   If no bookmark names or source revisions are specified, then this revset defaults to `closest_bookmarks(to)`.
+* `-t`, `--to <REVSET>` — Move bookmarks to this revision
+
+  Default value: `closest_pushable(@)`
+* `-B`, `--allow-backwards` — Allow moving bookmarks backwards or sideways
 
 
 
